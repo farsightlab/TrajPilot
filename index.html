@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrajPilot — How You Move Tells What You'll Do</title>
+<meta name="description" content="How You Move Tells What You'll Do: Trajectory-Conditioned Egocentric Prediction.">
+<meta name="keywords" content="egocentric video, action anticipation, procedural planning, V-JEPA, EgoVLPv2, Ego-Exo4D, trajectory">
+<meta property="og:title" content="TrajPilot: Trajectory-Conditioned Egocentric Prediction">
+<meta property="og:description" content="Future camera trajectory disambiguates near-future egocentric prediction better than language.">
+<meta property="og:image" content="assets/teaser.jpg">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Google+Sans:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --text:        #4a4a4a;
+    --text-strong: #222222;
+    --muted:       #7a7a7a;
+    --link:        #1d4ed8;
+    --link-hover:  #1e3a8a;
+    --rule:        #e6e6e6;
+    --rule-soft:   #f0f0f0;
+    --bg:          #ffffff;
+    --bg-soft:     #fafafa;
+    --bg-callout:  #f5f7fa;
+    --button-bg:   #2a2a2a;
+    --button-bg-h: #4a4a4a;
+    --accent:      #1d4ed8;
+    --good:        #2b8a3e;
+    --bad:         #c92a2a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  a { color: var(--link); text-decoration: none; transition: color 0.15s ease; }
+  a:hover { color: var(--link-hover); text-decoration: underline; }
+
+  /* italics stay in Noto Sans — no serif font swap */
+  em, i { font-style: italic; }
+  strong, b { color: var(--text-strong); font-weight: 600; }
+
+  .container { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+  /* ============ HERO ============ */
+  .hero {
+    padding: 64px 0 36px;
+    text-align: center;
+    border-bottom: 1px solid var(--rule);
+  }
+  .hero-title {
+    font-family: 'Google Sans', 'Noto Sans', sans-serif;
+    font-weight: 700;
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.18;
+    color: var(--text-strong);
+    margin: 0 auto 6px;
+    max-width: 24ch;
+    letter-spacing: -0.01em;
+  }
+  .hero-subtitle {
+    font-family: 'Google Sans', 'Noto Sans', sans-serif;
+    font-weight: 500;
+    font-size: clamp(20px, 2.6vw, 28px);
+    color: var(--text-strong);
+    margin: 0 0 28px;
+    line-height: 1.3;
+  }
+  .authors { font-size: 18px; color: var(--text-strong); margin: 0 0 8px; line-height: 1.8; }
+  .authors a { color: var(--link); font-weight: 500; }
+  .affiliation { font-size: 17px; color: var(--text); margin: 0 0 6px; }
+  .emails { font-family: 'Roboto Mono', monospace; font-size: 14px; color: var(--muted); margin: 0 0 4px; }
+  .venue {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Google Sans', sans-serif;
+    font-weight: 500;
+    font-size: 17px;
+    color: var(--text-strong);
+    margin: 18px 0 26px;
+  }
+  .venue .pill {
+    display: inline-block;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 3px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+
+  /* ============ BUTTONS ============ */
+  .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 20px;
+    background: var(--button-bg);
+    color: #ffffff;
+    border-radius: 999px;
+    font-family: 'Google Sans', 'Noto Sans', sans-serif;
+    font-weight: 500;
+    font-size: 15px;
+    text-decoration: none;
+    transition: background 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+    border: none;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .btn:hover { background: var(--button-bg-h); color: #ffffff; text-decoration: none; transform: translateY(-1px); }
+  .btn.disabled { opacity: 0.55; cursor: not-allowed; pointer-events: none; }
+  .btn svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+
+  /* ============ HOOK ============ */
+  .hook {
+    text-align: center;
+    padding: 48px 0 18px;
+  }
+  .hook .eyebrow {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .hook .question {
+    font-family: 'Google Sans', 'Noto Sans', sans-serif;
+    font-weight: 700;
+    font-size: clamp(24px, 3.4vw, 36px);
+    color: var(--text-strong);
+    line-height: 1.25;
+    max-width: 24ch;
+    margin: 0 auto 8px;
+    letter-spacing: -0.012em;
+  }
+  .hook .sub {
+    font-size: 16px;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* ============ TEASER ============ */
+  .teaser {
+    padding: 18px 0 4px;
+    text-align: center;
+  }
+  .teaser img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
+
+  /* ============ TEASER RESULTS TABLE ============ */
+  .teaser-table-wrap {
+    max-width: 720px;
+    margin: 32px auto 0;
+    padding: 0 8px;
+  }
+  table.teaser-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 16px;
+    background: #ffffff;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 0 var(--rule-soft);
+  }
+  table.teaser-table caption {
+    caption-side: top;
+    text-align: center;
+    font-family: 'Google Sans', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-strong);
+    margin-bottom: 14px;
+  }
+  table.teaser-table th, table.teaser-table td {
+    padding: 14px 18px;
+    text-align: left;
+    border-bottom: 1px solid var(--rule-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  table.teaser-table th {
+    background: var(--bg-callout);
+    color: var(--text-strong);
+    font-family: 'Google Sans', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  table.teaser-table td.acc {
+    text-align: right;
+    font-family: 'Google Sans', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--text-strong);
+    width: 180px;
+  }
+  table.teaser-table td.acc .pct { font-size: 14px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+  table.teaser-table tr.row-chance td.acc { color: var(--bad); }
+  table.teaser-table tr.row-ours td.acc { color: var(--accent); }
+  table.teaser-table tr.row-oracle td.acc { color: var(--good); }
+  table.teaser-table tr.row-ours { background: rgba(29,78,216,0.04); }
+  table.teaser-table tbody tr:last-child td { border-bottom: none; }
+  table.teaser-table td .method-name { font-weight: 600; color: var(--text-strong); }
+  table.teaser-table td .method-sub { display: block; font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  /* ============ SECTIONS ============ */
+  section { padding: 56px 0 16px; }
+
+  h2.section-title {
+    font-family: 'Google Sans', 'Noto Sans', sans-serif;
+    font-weight: 700;
+    font-size: clamp(26px, 3.2vw, 34px);
+    color: var(--text-strong);
+    text-align: center;
+    margin: 0 0 32px;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+
+  .prose {
+    max-width: 880px;
+    margin: 0 auto;
+    text-align: justify;
+    text-justify: inter-word;
+  }
+  .prose p { font-size: 17px; line-height: 1.7; color: var(--text); margin: 0 0 18px; }
+  .prose p:last-child { margin-bottom: 0; }
+
+  /* ============ KEY IDEA CARDS ============ */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    max-width: 1024px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--bg-soft);
+    border: 1px solid var(--rule-soft);
+    border-radius: 8px;
+    padding: 26px 22px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+  }
+  .card .num {
+    display: inline-block;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .card h3 {
+    font-family: 'Google Sans', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--text-strong);
+    margin: 0 0 10px;
+    line-height: 1.3;
+  }
+  .card p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text);
+    margin: 0;
+  }
+  @media (max-width: 760px) {
+    .cards { grid-template-columns: 1fr; }
+  }
+
+  /* ============ WHY SIDE-BY-SIDE ============ */
+  .why-grid {
+    max-width: 1024px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  .why-card {
+    background: var(--bg-soft);
+    border: 1px solid var(--rule-soft);
+    border-radius: 8px;
+    padding: 28px 26px;
+  }
+  .why-card .eyebrow {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .why-card h3 {
+    font-family: 'Google Sans', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--text-strong);
+    margin: 0 0 14px;
+    line-height: 1.3;
+    letter-spacing: -0.005em;
+  }
+  .why-card p {
+    font-size: 15.5px;
+    line-height: 1.65;
+    color: var(--text);
+    margin: 0 0 14px;
+  }
+  .why-card p:last-child { margin-bottom: 0; }
+  .why-card img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 16px auto 0;
+    border-radius: 4px;
+  }
+
+  /* Small table inside a why-card */
+  table.mini {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    font-size: 13.5px;
+    font-variant-numeric: tabular-nums;
+    background: #ffffff;
+    border: 1px solid var(--rule-soft);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  table.mini caption {
+    caption-side: bottom;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+    text-align: left;
+  }
+  table.mini th, table.mini td {
+    padding: 7px 10px;
+    text-align: right;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  table.mini th:first-child, table.mini td:first-child {
+    text-align: left;
+    color: var(--text-strong);
+    font-weight: 500;
+  }
+  table.mini thead th {
+    background: var(--bg-callout);
+    color: var(--text-strong);
+    font-family: 'Google Sans', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--rule);
+  }
+  table.mini td.best { color: var(--text-strong); font-weight: 700; background: rgba(29,78,216,0.06); }
+  table.mini td.good { color: var(--good); font-weight: 500; }
+  table.mini td.bad  { color: var(--bad);  font-weight: 500; }
+  table.mini tbody tr:last-child td { border-bottom: none; }
+
+  @media (max-width: 820px) {
+    .why-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ============ FIGURES ============ */
+  figure {
+    margin: 0 auto 12px;
+    text-align: center;
+    max-width: 100%;
+  }
+  figure img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    border-radius: 4px;
+  }
+  figure.bordered img { border: 1px solid var(--rule); }
+  figure figcaption {
+    max-width: 880px;
+    margin: 16px auto 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text);
+    text-align: justify;
+    text-justify: inter-word;
+  }
+  figure figcaption .lbl { font-weight: 700; color: var(--text-strong); margin-right: 4px; }
+
+  .method-intro {
+    text-align: center;
+    max-width: 760px;
+    margin: 0 auto 24px;
+    font-size: 16px;
+    color: var(--text);
+    line-height: 1.65;
+  }
+
+  .results-stack > figure { margin-bottom: 36px; }
+  .results-stack > figure:last-child { margin-bottom: 0; }
+
+  /* ============ BIBTEX ============ */
+  .bibtex-wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .bibtex-wrap pre {
+    background: #f7f7f7;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin: 0;
+    overflow-x: auto;
+    font-family: 'Roboto Mono', ui-monospace, monospace;
+    font-size: 13.5px;
+    color: var(--text-strong);
+    line-height: 1.65;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #ffffff;
+    border: 1px solid var(--rule);
+    color: var(--text);
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-family: 'Google Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .copy-btn:hover { background: var(--button-bg); color: #ffffff; border-color: var(--button-bg); }
+
+  /* ============ FOOTER ============ */
+  footer {
+    margin-top: 64px;
+    padding: 28px 0 40px;
+    border-top: 1px solid var(--rule);
+    text-align: center;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+  footer a { color: var(--link); }
+  footer p { margin: 5px 0; }
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 720px) {
+    body { font-size: 16px; }
+    .container { padding: 0 20px; }
+    .hero { padding: 40px 0 28px; }
+    section { padding: 40px 0 12px; }
+    .prose, figure figcaption { text-align: left; }
+    .btn { padding: 8px 16px; font-size: 14px; }
+    .emails { font-size: 12px; word-break: break-all; }
+    .hook .question { font-size: 22px; }
+    table.teaser-table th, table.teaser-table td { padding: 10px 12px; font-size: 13px; }
+    table.teaser-table td.acc { font-size: 18px; width: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ 1. HERO ============ -->
+<header class="hero">
+  <div class="container">
+    <h1 class="hero-title">How You Move Tells What You'll Do</h1>
+    <div class="hero-subtitle">Trajectory-Conditioned Egocentric Prediction</div>
+
+    <p class="authors">SeJoon Jun, <a href="https://itruonghai.github.io" target="_blank">Hai Nguyen-Truong</a>, <a href="https://seminaraluigi.altervista.org" target="_blank">Luigi Seminara</a>, <a href="https://ltorresa.github.io/home.html" target="_blank">Lorenzo Torresani</a></p>
+    <p class="affiliation">Northeastern University</p>
+    <p class="emails">{jun.se, nguyentruong.h, seminara.l, l.torresani}@northeastern.edu</p>
+
+    <div class="venue">arXiv 2026 <span class="pill">Preprint</span></div>
+
+    <div class="btn-row">
+      <a class="btn disabled" href="#" aria-label="Paper PDF">
+        <svg viewBox="0 0 384 512" xmlns="http://www.w3.org/2000/svg"><path d="M320 464c8.8 0 16-7.2 16-16V160h-80c-17.7 0-32-14.3-32-32V48H64c-8.8 0-16 7.2-16 16v384c0 8.8 7.2 16 16 16h256zM0 64C0 28.7 28.7 0 64 0h165.5c17 0 33.3 6.7 45.3 18.7l90.5 90.5c12 12 18.7 28.3 18.7 45.3V448c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V64z"/></svg>
+        Paper (soon)
+      </a>
+      <a class="btn disabled" href="#" aria-label="arXiv">
+        <svg viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><path d="M380.6 81.7c7.9 15.8 1.5 35-14.3 42.9L103.6 256l262.7 131.4c15.8 7.9 22.2 27.1 14.3 42.9s-27.1 22.2-42.9 14.3l-320-160C6.8 279.2 0 268.1 0 256s6.8-23.2 17.7-28.6l320-160c15.8-7.9 35-1.5 42.9 14.3z"/></svg>
+        arXiv (soon)
+      </a>
+      <a class="btn disabled" href="#" aria-label="Code">
+        <svg viewBox="0 0 640 512" xmlns="http://www.w3.org/2000/svg"><path d="M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3L562.7 256l-89.4 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z"/></svg>
+        Code (soon)
+      </a>
+      <a class="btn" href="assets/poster.jpg" target="_blank" aria-label="Poster">
+        <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="M448 80c8.8 0 16 7.2 16 16V416c0 8.8-7.2 16-16 16H64c-8.8 0-16-7.2-16-16V96c0-8.8 7.2-16 16-16H448zM64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zm80 256a64 64 0 1 0 0-128 64 64 0 1 0 0 128zm107.3-55.3l-72.6 72.6 22.6 22.6c4.4 4.4 11.5 4.4 15.9 0L320 269.4l92.7 92.7c4.4 4.4 11.5 4.4 15.9 0L432 358.6V416H80V395.3l99.3-99.3c4.4-4.4 11.5-4.4 15.9 0z"/></svg>
+        Poster
+      </a>
+      <a class="btn" href="#bibtex" aria-label="BibTeX">
+        <svg viewBox="0 0 384 512" xmlns="http://www.w3.org/2000/svg"><path d="M64 0C28.7 0 0 28.7 0 64V448c0 35.3 28.7 64 64 64H320c35.3 0 64-28.7 64-64V160H256c-17.7 0-32-14.3-32-32V0H64zM256 0V128H384L256 0zM112 256H272c8.8 0 16 7.2 16 16s-7.2 16-16 16H112c-8.8 0-16-7.2-16-16s7.2-16 16-16zm0 64H272c8.8 0 16 7.2 16 16s-7.2 16-16 16H112c-8.8 0-16-7.2-16-16s7.2-16 16-16zm0 64H272c8.8 0 16 7.2 16 16s-7.2 16-16 16H112c-8.8 0-16-7.2-16-16s7.2-16 16-16z"/></svg>
+        BibTeX
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- ============ 2. HOOK + TEASER + RESULTS TABLE ============ -->
+<div class="container hook">
+  <p class="question">Do you think the shot will go in?</p>
+  <p class="sub">From a single pre-shot egocentric frame, can you tell?</p>
+</div>
+
+<div class="container teaser">
+  <img src="assets/teaser.jpg" alt="Same egocentric pre-shot view admits multiple shot outcomes, disambiguated by future trajectory.">
+</div>
+
+<div class="teaser-table-wrap">
+  <table class="teaser-table">
+    <caption>Shot-outcome prediction accuracy</caption>
+    <thead>
+      <tr>
+        <th>Method</th>
+        <th style="text-align:right;">Accuracy</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="row-chance">
+        <td><span class="method-name">Pixels only</span><span class="method-sub">No trajectory &mdash; near chance</span></td>
+        <td class="acc">56.8<span class="pct">%</span></td>
+      </tr>
+      <tr>
+        <td><span class="method-name">V-JEPA 2.1 attentive probe</span><span class="method-sub">Pixels only, stronger head</span></td>
+        <td class="acc">63.5<span class="pct">%</span></td>
+      </tr>
+      <tr class="row-ours">
+        <td><span class="method-name">TrajPilot (Ours)</span><span class="method-sub">Predicted future trajectory</span></td>
+        <td class="acc">81.1<span class="pct">%</span></td>
+      </tr>
+      <tr class="row-oracle">
+        <td><span class="method-name">Oracle</span><span class="method-sub">Observed future trajectory</span></td>
+        <td class="acc">93.2<span class="pct">%</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============ 3. ABSTRACT ============ -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Abstract</h2>
+    <div class="prose">
+      <p>
+        Predicting how a person's first-person view will evolve (what action will follow, what plan completes
+        a task, whether an in-progress shot will score) is fundamentally under-specified: the same context admits
+        many plausible futures, and a model trained to minimize prediction error is forced to hedge or average
+        across them, getting it wrong either way.
+      </p>
+      <p>
+        Two findings shape our approach. <strong>First,</strong> the future camera trajectory, the path the head
+        carves through space, lets the model commit to one of those futures: it carries the operator's intent in
+        a form fine enough to determine how an action will unfold, substantially outperforming language as a
+        conditioning signal. <strong>Second,</strong> this same intent makes the trajectory itself partially
+        predictable from the context at hand, enough that trajectory need not be observed at test time to recover
+        most of the gain.
+      </p>
+      <p>
+        We instantiate these findings as <strong>TrajPilot</strong>, a model that predicts candidate future
+        trajectories from egocentric context and uses them to pilot action prediction in an action-aligned
+        embedding space where language shapes the structure but is never used as a conditioning input. TrajPilot
+        beats VLM and structured-planner baselines on procedural planning across <strong>Ego-Exo4D atomic</strong>,
+        <strong>Ego-Exo4D Keystep</strong>, <strong>Ego4D GoalStep</strong>, and <strong>EgoPER</strong>, with
+        the trajectory advantage widening with horizon (exactly where prior planners collapse) and holding under
+        RGB-only camera-pose estimation. With the goal masked at inference, the same model performs goal-free
+        anticipation, beating VLM baselines on Ego-Exo4D atomic and extending to <strong>EPIC-Kitchens-100</strong>
+        and basketball shot-outcome prediction.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. KEY IDEAS ============ -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Key ideas</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="num">01</div>
+        <h3>Same view, many futures</h3>
+        <p>Egocentric observations are ambiguous. Multiple actions and outcomes are consistent with the same visual context.</p>
+      </div>
+      <div class="card">
+        <div class="num">02</div>
+        <h3>Motion reveals intent</h3>
+        <p>Future camera trajectory is physically grounded and fine-grained, capturing how the wearer is about to move.</p>
+      </div>
+      <div class="card">
+        <div class="num">03</div>
+        <h3>Predict the trajectory</h3>
+        <p>Future trajectory is unobserved at test time, so TrajPilot retrieves candidate trajectories and learns when to trust them.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. WHY TRAJECTORY + WHY NOT V-JEPA (SIDE-BY-SIDE) ============ -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Two questions</h2>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="eyebrow">Question 1</div>
+        <h3>Why trajectory?</h3>
+        <p>
+          Language is coarse. The cook can "whisk the eggs" gently or splatter them out of the bowl &mdash; the
+          description is shared across success and failure. What separates them is how the body moves.
+        </p>
+        <p>
+          Camera trajectory is physically grounded and causally tied to outcome. Trained on Ego-Exo4D, a
+          future-latent predictor cuts validation loss <strong>20&times; more</strong> under trajectory than
+          under language:
+        </p>
+        <table class="mini">
+          <thead>
+            <tr>
+              <th>Conditioning</th>
+              <th>Val &#8467;<sub>1</sub> &darr;</th>
+              <th>&Delta; vs none</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>none</td><td>0.4773</td><td>&mdash;</td></tr>
+            <tr><td>text</td><td>0.4761</td><td class="good">&minus;0.001</td></tr>
+            <tr><td>trajectory</td><td>0.4572</td><td class="good">&minus;0.020</td></tr>
+            <tr><td>text + traj</td><td class="best">0.4569</td><td class="good">&minus;0.020</td></tr>
+            <tr><td>shuffled text</td><td>0.4575</td><td class="good">&minus;0.020</td></tr>
+            <tr><td>shuffled traj</td><td>0.4964</td><td class="bad">+0.019</td></tr>
+          </tbody>
+          <caption>Shuffling trajectory hurts; shuffling text doesn't.</caption>
+        </table>
+      </div>
+
+      <div class="why-card">
+        <div class="eyebrow">Question 2</div>
+        <h3>Why not search in V-JEPA space?</h3>
+        <p>
+          A natural baseline is to search candidate trajectories by &#8467;<sub>1</sub> distance to the goal
+          latent in V-JEPA space. <strong>This actively underperforms ignoring trajectory entirely.</strong>
+        </p>
+        <p>
+          V-JEPA latents are organized by visual continuity, not by what someone is doing. CEM ends up optimizing
+          visual similarity, not action correctness &mdash; motivating an <strong>action-aligned</strong> space.
+        </p>
+        <img src="assets/cem_diagnostic.jpg" alt="CEM in V-JEPA latent space underperforms No-Traj at every horizon.">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6. ARCHITECTURE ============ -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Our architecture</h2>
+    <p class="method-intro">
+      TrajPilot compresses start and goal clips with frozen <strong>V-JEPA 2.1</strong> features, aligns
+      trajectory embeddings with action semantics, and rolls out a causal predictor whose outputs are read
+      against an <strong>EgoVLPv2</strong> action bank.
+    </p>
+    <figure class="bordered">
+      <img src="assets/architecture.jpg" alt="TrajPilot architecture: training and inference modes.">
+    </figure>
+  </div>
+</section>
+
+<!-- ============ 7. RESULTS ============ -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Results</h2>
+    <p class="method-intro">
+      TrajPilot improves planning and anticipation across open- and closed-vocabulary settings on Ego-Exo4D,
+      with the trajectory advantage widening at long horizons.
+    </p>
+    <div class="results-stack">
+      <figure>
+        <img src="assets/results_planning.jpg" alt="Atomic-action planning results across horizons.">
+        <figcaption>
+          <span class="lbl">Planning.</span>
+          Left and middle: open vocabulary (|V|=8,472), Mid R@1 and exact mid-sequence match versus horizon;
+          baselines are VLMs. Right: closed vocabulary (|V|=1,165) against structured procedural planners.
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="assets/results_anticipation.jpg" alt="Open-vocabulary atomic anticipation results.">
+        <figcaption>
+          <span class="lbl">Anticipation.</span>
+          Open-vocabulary atomic anticipation on Ego-Exo4D with the goal removed at inference. TrajPilot
+          (Scorer) beats the best VLM by <strong>+13 to +19 pp</strong> across horizons.
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="teaser-table-wrap" style="margin-top: 48px;">
+      <table class="teaser-table">
+        <caption style="margin-bottom: 16px;">Robustness to RGB-only camera-pose estimation (Keystep, H=3–8)</caption>
+        <thead>
+          <tr>
+            <th>Setting (Train &rarr; Eval)</th>
+            <th style="text-align:right;">Mid mAcc</th>
+            <th style="text-align:right;">Full mAcc</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="method-name">Aria &rarr; Aria</span><span class="method-sub">Ground-truth pose</span></td>
+            <td class="acc">19.47</td>
+            <td class="acc">24.29</td>
+          </tr>
+          <tr>
+            <td><span class="method-name">PI3 &rarr; PI3</span><span class="method-sub">RGB-estimated pose</span></td>
+            <td class="acc">19.65</td>
+            <td class="acc">24.23</td>
+          </tr>
+          <tr>
+            <td><span class="method-name">Aria &rarr; PI3</span><span class="method-sub">Source mismatch (failure mode)</span></td>
+            <td class="acc" style="color: var(--bad);">12.65</td>
+            <td class="acc" style="color: var(--bad);">18.96</td>
+          </tr>
+          <tr class="row-ours">
+            <td><span class="method-name">Aria+PI3 &rarr; PI3</span><span class="method-sub">Mixed training</span></td>
+            <td class="acc">19.53</td>
+            <td class="acc">24.37</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 8. QUALITATIVE ============ -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Qualitative examples</h2>
+    <p class="method-intro">
+      Predicted action plans versus ground truth on Ego-Exo4D atomic action. TrajPilot recovers the correct steps
+      where the VLM baseline substitutes plausible-looking but wrong actions.
+    </p>
+    <figure>
+      <img src="assets/qualitative.jpg" alt="Predicted action plans vs ground truth on four Ego-Exo4D examples.">
+    </figure>
+  </div>
+</section>
+
+<!-- ============ 9. BIBTEX ============ -->
+<section id="bibtex">
+  <div class="container">
+    <h2 class="section-title">BibTeX</h2>
+    <div class="bibtex-wrap">
+      <button class="copy-btn" onclick="copyBibtex(this)">Copy</button>
+<pre>@article{jun2026trajpilot,
+  title   = {How You Move Tells What You'll Do:
+             Trajectory-Conditioned Egocentric Prediction},
+  author  = {Jun, SeJoon and Nguyen-Truong, Hai and
+             Seminara, Luigi and Torresani, Lorenzo},
+  journal = {arXiv preprint},
+  year    = {2026}
+}</pre>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>Northeastern University &middot; arXiv 2026</p>
+    <p>Template inspired by <a href="https://nerfies.github.io/" target="_blank" rel="noopener">Nerfies</a> and <a href="https://vision.cs.utexas.edu/projects/EgoExo-WM/" target="_blank" rel="noopener">EgoExo-WM</a>.</p>
+  </div>
+</footer>
+
+<script>
+  function copyBibtex(btn) {
+    const pre = btn.parentElement.querySelector('pre');
+    navigator.clipboard.writeText(pre.innerText).then(() => {
+      const orig = btn.innerText;
+      btn.innerText = 'Copied \u2713';
+      btn.style.background = '#2a2a2a';
+      btn.style.color = '#ffffff';
+      btn.style.borderColor = '#2a2a2a';
+      setTimeout(() => {
+        btn.innerText = orig;
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      }, 1600);
+    }).catch(() => { btn.innerText = '...'; });
+  }
+</script>
+
+</body>
+</html>
